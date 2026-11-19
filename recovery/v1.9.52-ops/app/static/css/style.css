@@ -1,4 +1,4 @@
-/* Cisco Network Manager design system · v1.9.52.11 */
+/* Cisco Network Manager design system · v1.9.52.12 */
 :root {
     --primary: #1769e0;
     --primary-dark: #0d4fb3;
@@ -875,6 +875,9 @@ code { padding: 1px 5px; border-radius: 5px; color: #23578e; background: #edf4fc
 .cmdb-governance article:last-child { border-right: 0; }
 .cmdb-governance strong { color: #19364e; }
 .cmdb-governance span { color: #647b8e; font-size: 12px; line-height: 1.55; }
+.mail-module-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px; }
+.mail-module-card { border:1px solid var(--border,#e4ebf1); border-radius:12px; padding:16px; background:#f8fafc; display:grid; gap:12px; }
+.mail-module-card label { display:grid; gap:6px; }
 
 @media (max-width: 900px) {
     .cmdb-page-actions { justify-content: flex-start; }

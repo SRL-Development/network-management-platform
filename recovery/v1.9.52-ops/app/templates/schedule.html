@@ -63,6 +63,7 @@ const TASK_TYPE_LABELS = {
     'info': '数据采集',
     'zabbix_sync': 'Zabbix 资产同步',
     'vcenter_sync': 'vCenter 资产同步',
+    'email_notify': '邮件提醒检查',
 };
 const CRON_PRESETS = {
     '0 2 * * *': '每天 02:00',
@@ -149,6 +150,7 @@ function scheduleFormHtml(prefix, s) {
                 <option value="info" ${t==='info'?'selected':''}>数据采集</option>
                 <option value="zabbix_sync" ${t==='zabbix_sync'?'selected':''}>Zabbix 资产同步</option>
                 <option value="vcenter_sync" ${t==='vcenter_sync'?'selected':''}>vCenter 资产同步</option>
+                <option value="email_notify" ${t==='email_notify'?'selected':''}>邮件提醒检查</option>
             </select>
         </div>
         <div class="form-group">

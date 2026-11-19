@@ -152,6 +152,13 @@ class CMDBCatalogRequest(StrictRequest):
         return cleaned
 
 
+class AutoLinkRequest(StrictRequest):
+    include_devices: bool = True
+    include_servers: bool = True
+    create_missing: bool = True
+    sync_existing: bool = True
+
+
 def _audit(request: Request, action: str, resource_id: str = "", detail: Optional[dict] = None):
     request.state.audit_action = action
     request.state.audit_resource_type = "cmdb_asset"
@@ -594,6 +601,115 @@ def _resolve_link_names(db: Session, data: dict):
         if len(matches) != 1:
             raise ValueError(f"关联服务器/存储名称“{server_name}”匹配数量为 {len(matches)}")
         data["linked_server_id"] = matches[0].id
+
+
+def _request_from_asset(asset: CMDBAsset, **updates) -> CMDBAssetRequest:
+    data = {
+        "name": asset.name, "asset_class": asset.asset_class or "硬件", "asset_type": asset.asset_type,
+        "company": asset.company or "", "brand": asset.brand or "", "model": asset.model or "",
+        "asset_tag": asset.asset_tag or "", "linked_device_id": asset.linked_device_id,
+        "linked_server_id": asset.linked_server_id, "lifecycle_status": asset.lifecycle_status,
+        "operational_status": asset.operational_status or "运行", "criticality": asset.criticality,
+        "environment": asset.environment or "生产", "business_service": asset.business_service or "",
+        "source_of_truth": asset.source_of_truth or "手工维护", "last_verified_date": asset.last_verified_date,
+        "purchase_date": asset.purchase_date, "initial_expiry_date": asset.initial_expiry_date,
+        "vendor": asset.vendor or "", "purchase_order": asset.purchase_order or "",
+        "purchase_cost": asset.purchase_cost, "currency": asset.currency or "CNY",
+        "department": asset.department or "", "owner": asset.owner or "", "location": asset.location or "",
+        "notes": asset.notes or "",
+        "ip_addresses": [{"address": row.address, "purpose": row.purpose or "管理", "is_primary": row.is_primary} for row in asset.ip_addresses],
+        "serial_numbers": [{"serial_number": row.serial_number, "kind": row.kind or "主机序列号", "label": row.label or ""} for row in asset.serial_numbers],
+        "entitlements": [{
+            "entitlement_type": row.entitlement_type, "name": row.name, "vendor": row.vendor or "",
+            "contract_number": row.contract_number or "", "start_date": row.start_date, "end_date": row.end_date,
+            "reminder_days": row.reminder_days, "notes": row.notes or "",
+        } for row in asset.entitlements],
+    }
+    data.update(updates)
+    return CMDBAssetRequest.model_validate(data)
+
+
+def _request_from_snapshot(source: dict, kind: str) -> CMDBAssetRequest:
+    return CMDBAssetRequest(
+        name=source["name"], asset_class=source["asset_class"], asset_type=source["asset_type"],
+        company=source.get("company", ""), brand=source.get("brand", ""), model=source.get("model", ""),
+        asset_tag=source.get("asset_tag", ""), linked_device_id=source["id"] if kind == "device" else None,
+        linked_server_id=source["id"] if kind == "server" else None,
+        operational_status=source.get("operational_status", "未知"), source_of_truth=source["source_of_truth"],
+        last_verified_date=source.get("last_verified_date"), location=source.get("location", ""),
+        owner=source.get("owner", ""),
+        ip_addresses=[IPInput(address=value, purpose="管理", is_primary=index == 0) for index, value in enumerate(source.get("ips", []))],
+        serial_numbers=[SerialInput(serial_number=value, kind="主机序列号", label=source["name"]) for value in source.get("serials", [])],
+    )
+
+
+@router.get("/auto-link/preview")
+def preview_auto_link(db: Session = Depends(get_db)):
+    device_total = db.query(Device).count()
+    server_total = db.query(ServerAsset).count()
+    linked_devices = db.query(CMDBAsset.linked_device_id).filter(CMDBAsset.linked_device_id.is_not(None)).distinct().count()
+    linked_servers = db.query(CMDBAsset.linked_server_id).filter(CMDBAsset.linked_server_id.is_not(None)).distinct().count()
+    return {
+        "devices": {"total": device_total, "linked": linked_devices, "unlinked": max(device_total - linked_devices, 0)},
+        "servers": {"total": server_total, "linked": linked_servers, "unlinked": max(server_total - linked_servers, 0)},
+    }
+
+
+@router.post("/auto-link")
+def auto_link(payload: AutoLinkRequest, request: Request, db: Session = Depends(get_db)):
+    assets = _query(db).all()
+    indexes, by_id, add_index = _import_indexes(assets)
+    sources = []
+    if payload.include_devices:
+        sources.extend(("device", _device_snapshot(db, row)) for row in db.query(Device).order_by(Device.id).all())
+    if payload.include_servers:
+        sources.extend(("server", _server_snapshot(db, row)) for row in db.query(ServerAsset).order_by(ServerAsset.id).all())
+    created = updated = skipped = ambiguous = 0
+    errors = []
+    for kind, source in sources:
+        try:
+            source_request = _request_from_snapshot(source, kind)
+            asset = _match_import(source_request, indexes, by_id)
+            if asset is None:
+                name_matches = [row for row in by_id.values()
+                                if not row.linked_device_id and not row.linked_server_id
+                                and _normal_key(row.name) == _normal_key(source["name"])
+                                and _normal_key(row.company) == _normal_key(source.get("company", ""))]
+                if len(name_matches) > 1:
+                    raise ValueError("公司+名称匹配到多条未关联 CMDB 资产")
+                asset = name_matches[0] if name_matches else None
+            if asset:
+                conflict = (
+                    kind == "device" and asset.linked_device_id not in (None, source["id"])
+                ) or (
+                    kind == "server" and asset.linked_server_id not in (None, source["id"])
+                ) or (kind == "device" and asset.linked_server_id is not None) or (kind == "server" and asset.linked_device_id is not None)
+                if conflict:
+                    skipped += 1
+                    errors.append({"source": source["name"], "error": "稳定标识匹配到已关联其他来源的 CMDB 资产"})
+                    continue
+                if not payload.sync_existing:
+                    skipped += 1
+                    continue
+                updates = {"linked_device_id": source["id"]} if kind == "device" else {"linked_server_id": source["id"]}
+                merged = _hydrate_linked(db, _request_from_asset(asset, **updates), overwrite=True)
+                _apply(asset, merged)
+                updated += 1
+            elif payload.create_missing:
+                asset = CMDBAsset()
+                _apply(asset, source_request)
+                asset.lifecycle_events.append(CMDBLifecycleEvent(stage="在用", event_date=date.today(), notes="一键关联自动创建"))
+                db.add(asset); db.flush(); created += 1
+            else:
+                skipped += 1
+                continue
+            db.flush(); add_index(asset)
+        except ValueError as exc:
+            ambiguous += 1
+            errors.append({"source": source["name"], "error": str(exc)[:300]})
+    db.commit()
+    _audit(request, "cmdb.asset.auto_link", detail={"created": created, "updated": updated, "skipped": skipped, "ambiguous": ambiguous})
+    return {"ok": not errors, "total": len(sources), "created": created, "updated": updated, "skipped": skipped, "ambiguous": ambiguous, "errors": errors[:100]}
 
 
 @router.get("/export")

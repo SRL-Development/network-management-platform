@@ -23,7 +23,7 @@ init_db()  # Exercises pg_dump and repeated Alembic startup, preserving data.
 with SessionLocal() as db:
     assert db.get(SystemSetting,'pg-preserve').value=='keep'
     assert db.query(VMInstance).count()==1
-    assert db.execute(text('SELECT version_num FROM alembic_version')).scalar()=='20261119_0012'
+    assert db.execute(text('SELECT version_num FROM alembic_version')).scalar()=='20261119_0013'
 from app.services.data_backup import create_data_backup, restore_data_backup
 assert not create_data_backup()['ok']
 assert not restore_data_backup(b'not-a-sqlite-backup')['ok']

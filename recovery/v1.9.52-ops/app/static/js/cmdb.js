@@ -187,6 +187,17 @@
     } catch(error) { $('cmdb-catalog-error').textContent=error.message; }
   }
 
+  async function autoLink() {
+    const preview=await API.get('/api/cmdb/auto-link/preview');
+    const message=`将扫描网络设备 ${preview.devices.total} 台（未关联 ${preview.devices.unlinked}）和服务器/存储 ${preview.servers.total} 台（未关联 ${preview.servers.unlinked}）。\n\n已有 CMDB 记录会按关联对象、资产编号、序列号、IP、公司+名称+类型匹配并补全；未匹配对象将自动创建。是否继续？`;
+    if(!confirm(message))return;
+    const result=await API.post('/api/cmdb/auto-link',{include_devices:true,include_servers:true,create_missing:true,sync_existing:true});
+    const summary=`一键关联完成：新增 ${result.created}，同步 ${result.updated}，跳过 ${result.skipped}，歧义 ${result.ambiguous}`;
+    showToast(summary,result.errors?.length?'warning':'success');
+    if(result.errors?.length)alert(summary+'\n\n'+result.errors.slice(0,20).map(item=>`${item.source}：${item.error}`).join('\n'));
+    await Promise.all([loadCatalog(),loadAssets(),loadSummary()]);
+  }
+
   async function openTimeline(id) {
     const row=await API.get(`/api/cmdb/assets/${id}`); $('cmdb-timeline-title').textContent=`${row.name} · 生命周期`; $('cmdb-event-asset-id').value=id; $('cmdb-event-stage').value=row.lifecycle_status; $('cmdb-event-date').value=today();
     $('cmdb-event-list').innerHTML=row.lifecycle_events.length?row.lifecycle_events.map(event=>`<article class="cmdb-event"><strong>${escapeHtml(event.stage)}</strong><span>${dateText(event.event_date)}</span><div>${escapeHtml(event.notes||'-')}<br><small>${escapeHtml(event.operator||'系统')}</small></div></article>`).join(''):'<div class="empty-state">暂无生命周期事件</div>'; openModal('cmdb-timeline');
@@ -210,6 +221,7 @@
     $('cmdb-link-kind').onchange=()=>fillLinkOptions(); $('cmdb-link-id').onchange=()=>importLinked(false,true); $('cmdb-import-linked').onclick=()=>importLinked(true,false);
     $('cmdb-export').onclick=()=>exportAssets(false); $('cmdb-template').onclick=()=>exportAssets(true); $('cmdb-import').onclick=()=>$('cmdb-import-file').click(); $('cmdb-import-file').onchange=importCsv;
     $('cmdb-manage-catalog').onclick=openCatalog; $('cmdb-catalog-form').onsubmit=saveCatalog; document.querySelectorAll('[data-catalog-close]').forEach(el=>el.onclick=()=>closeModal('cmdb-catalog-modal'));
+    $('cmdb-auto-link').onclick=()=>autoLink().catch(error=>showToast(`一键关联失败：${error.message}`,'error'));
     $('cmdb-add-ip').onclick=()=>addIp(); $('cmdb-add-serial').onclick=()=>addSerial(); $('cmdb-add-entitlement').onclick=()=>addEntitlement();
     document.addEventListener('click',e=>{const remove=e.target.closest('.cmdb-remove');if(remove)remove.parentElement.remove();});
     document.querySelectorAll('[data-cmdb-close]').forEach(el=>el.onclick=()=>closeModal('cmdb-editor')); document.querySelectorAll('[data-timeline-close]').forEach(el=>el.onclick=()=>closeModal('cmdb-timeline'));

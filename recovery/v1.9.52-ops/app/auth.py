@@ -48,6 +48,7 @@ MODULES = [
     ("assets", "其他资产", "📦"),
     ("servers", "服务器存储", "🖥️"),
     ("cmdb", "CMDB生命周期", "🧭"),
+    ("notifications", "邮件通知", "✉️"),
     ("vms", "虚拟机系统", "💻"),
     ("integrations", "平台集成", "🔗"),
     ("accounts", "账号密码", "🔑"),
@@ -66,6 +67,7 @@ MODULE_LABELS = {m[0]: m[1] for m in MODULES}
 
 # 请求路径 -> 模块 前缀映射（取最长匹配）。
 PATH_MODULES = [
+    ("/api/notifications", "notifications"), ("/notifications", "notifications"),
     ("/api/isp", "isp"), ("/isp", "isp"),
     ("/api/users", "users"), ("/users", "users"),
     ("/api/accounts", "accounts"), ("/accounts", "accounts"),

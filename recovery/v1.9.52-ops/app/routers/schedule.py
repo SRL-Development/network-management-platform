@@ -16,11 +16,12 @@ router = APIRouter(prefix="/api/schedule", tags=["schedule"])
 
 
 def _require_integration_permission(request: Request, task_type: str) -> None:
-    if task_type not in {"zabbix_sync", "vcenter_sync"}:
+    if task_type not in {"zabbix_sync", "vcenter_sync", "email_notify"}:
         return
     user = getattr(request.state, "user", None)
-    if not user or (not user.is_superuser and "integrations" not in (user.get_modules() or [])):
-        raise HTTPException(status_code=403, detail="创建或执行平台同步任务还需要平台集成权限")
+    required = "notifications" if task_type == "email_notify" else "integrations"
+    if not user or (not user.is_superuser and required not in (user.get_modules() or [])):
+        raise HTTPException(status_code=403, detail="创建或执行该任务还需要对应模块权限")
 
 
 @router.get("", response_model=List[ScheduleConfigResponse])

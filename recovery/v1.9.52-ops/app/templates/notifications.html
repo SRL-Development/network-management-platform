@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header">
+  <div><h1>✉ 邮件通知中心</h1><p>匿名 SMTP 投递；按模块选择、自定义邮件内容，并确认不再重复提醒的事项。</p></div>
+  <div><button class="btn btn-outline" id="mail-test" type="button">测试 SMTP</button> <button class="btn btn-outline" id="mail-run" type="button">立即检查并发送</button> <button class="btn btn-primary" id="mail-save" type="button">保存设置</button></div>
+</div>
+
+<section class="card"><div class="card-header">匿名 SMTP 连接</div><div class="card-body">
+  <p class="alert alert-info">平台不会保存或发送 SMTP 用户名、密码，也不会调用 AUTH/LOGIN。请确保邮件服务器允许本机 IP 匿名中继到指定收件人。</p>
+  <div class="cmdb-form-grid">
+    <label class="check-line"><input id="mail-enabled" type="checkbox"> 启用定时邮件提醒</label>
+    <label>SMTP 服务器<input id="mail-host" class="form-control" placeholder="smtp.example.local"></label>
+    <label>端口<input id="mail-port" class="form-control" type="number" min="1" max="65535" value="25"></label>
+    <label>连接安全<select id="mail-security" class="form-control"><option value="none">无加密</option><option value="starttls">STARTTLS</option><option value="ssl">SSL/TLS</option></select></label>
+    <label>发件人<input id="mail-from" class="form-control" placeholder="network-manager@example.com"></label>
+    <label class="span-2">收件人（每行一个）<textarea id="mail-recipients" class="form-control" rows="4" placeholder="ops@example.com&#10;manager@example.com"></textarea></label>
+    <label>未确认重复周期（天）<input id="mail-repeat-days" class="form-control" type="number" min="1" max="365" value="7"></label>
+    <label>CMDB 到期窗口（天）<input id="mail-cmdb-days" class="form-control" type="number" min="1" max="3650" value="90"></label>
+    <label>备份覆盖统计周期（天）<input id="mail-coverage-days" class="form-control" type="number" min="1" max="365" value="7"></label>
+    <label>备份覆盖率阈值（%）<input id="mail-min-rate" class="form-control" type="number" min="0" max="100" step="0.1" value="95"></label>
+  </div>
+</div></section>
+
+<section class="card"><div class="card-header">邮件模块与自定义模板</div><div class="card-body"><div id="mail-modules" class="mail-module-grid"></div><p><code>{count}</code> <code>{items}</code> <code>{generated_at}</code> <code>{days}</code> <code>{repeat_days}</code> <code>{backup_rate}</code> <code>{covered}</code> <code>{total}</code> 等变量可用于模板。</p></div></section>
+
+<section class="card"><div class="card-header">待确认提醒</div><div class="card-body">
+  <div class="cmdb-toolbar"><div class="cmdb-filters"><label>模块<select id="mail-alert-module" class="form-control"><option value="">全部模块</option></select></label><button class="btn btn-outline" id="mail-refresh" type="button">刷新</button></div><div class="cmdb-bulk"><span id="mail-selected-count">已选择 0 项</span><button class="btn btn-primary" id="mail-ack" type="button">确认选中，停止重复提醒</button></div></div>
+  <div class="table-container"><table class="data-table"><thead><tr><th><input id="mail-select-all" type="checkbox"></th><th>模块</th><th>提醒事项</th><th>首次发现</th><th>上次发送</th><th>状态</th></tr></thead><tbody id="mail-alert-rows"><tr><td colspan="6" class="empty-state">加载中…</td></tr></tbody></table></div>
+</div></section>
+{% endblock %}
+{% block scripts %}<script src="/static/js/notifications.js?v={{APP_VERSION}}"></script>{% endblock %}

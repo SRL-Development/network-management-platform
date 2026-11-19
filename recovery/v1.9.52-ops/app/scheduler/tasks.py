@@ -11,6 +11,7 @@ from app.services.backup_service import backup_multiple_devices
 from app.services.discovery_service import discover_multiple_devices
 from app.services.info_service import collect_multiple_devices_info
 from app.services.integration_sync_service import run_scheduled_sync
+from app.services.email_notifications import run_email_notifications
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -98,6 +99,7 @@ TASK_MAP = {
     "info": collect_multiple_devices_info,
     "zabbix_sync": _run_zabbix_sync,
     "vcenter_sync": _run_vcenter_sync,
+    "email_notify": run_email_notifications,
 }
 
 VALID_TASK_TYPES = set(TASK_MAP.keys())
@@ -138,7 +140,7 @@ def _run_task(schedule_id: int):
         finally:
             ddb.close()
 
-        if device_ids or task_type in {"zabbix_sync", "vcenter_sync"}:
+        if device_ids or task_type in {"zabbix_sync", "vcenter_sync", "email_notify"}:
             logger.info(f"Scheduled '{task_type}' (schedule {schedule_id}) starting")
             hdb = SessionLocal()
             try:
@@ -192,6 +194,7 @@ def init_scheduler():
             ("info", settings.DEFAULT_INFO_SCHEDULE, "每周设备数据采集", True),
             ("zabbix_sync", "15 */1 * * *", "Zabbix 每小时资产同步", False),
             ("vcenter_sync", "30 */1 * * *", "vCenter 每小时资产同步", False),
+            ("email_notify", "0 9 * * *", "邮件提醒每日检查（按重复周期投递）", True),
         ]
 
         for task_type, cron_expr, description, enabled in defaults:

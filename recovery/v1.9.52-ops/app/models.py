@@ -820,6 +820,24 @@ class SystemSetting(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class NotificationAlert(Base):
+    """Persistent, acknowledgeable event used by scheduled email reminders."""
+    __tablename__ = "notification_alerts"
+    __table_args__ = (UniqueConstraint("module", "event_key", name="uq_notification_module_event"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    module = Column(String(50), nullable=False, index=True)
+    event_key = Column(String(300), nullable=False)
+    title = Column(String(300), nullable=False)
+    detail = Column(JSON, default=dict)
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    first_seen_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    last_seen_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    last_sent_at = Column(DateTime, nullable=True, index=True)
+    acknowledged_at = Column(DateTime, nullable=True, index=True)
+    acknowledged_by = Column(String(100), default="")
+
+
 class Account(Base):
     """通用账号密码保险柜（含 AD 同步导入的账号）。
 

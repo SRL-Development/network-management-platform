@@ -121,6 +121,30 @@ class CMDBTests(unittest.TestCase):
         self.assertEqual([item["address"] for item in row["ip_addresses"]], ["10.0.0.1"])
         self.assertEqual([item["serial_number"] for item in row["serial_numbers"]], ["FOC-LINKED-1"])
 
+    def test_one_click_auto_link_creates_then_synchronizes(self):
+        self.device.company = "集团总部"
+        self.device.model = "C9500"
+        self.db.add(DeviceInfo(device_id=self.device.id, vendor="Cisco", serial_number="AUTO-SN-1"))
+        self.db.commit()
+        preview = self.client.get("/api/cmdb/auto-link/preview")
+        self.assertEqual(preview.status_code, 200, preview.text)
+        self.assertEqual(preview.json()["devices"]["unlinked"], 1)
+        first = self.client.post("/api/cmdb/auto-link", json={
+            "include_devices": True, "include_servers": False,
+            "create_missing": True, "sync_existing": True,
+        })
+        self.assertEqual(first.status_code, 200, first.text)
+        self.assertEqual((first.json()["created"], first.json()["updated"]), (1, 0))
+        row = self.client.get("/api/cmdb/assets").json()[0]
+        self.assertEqual(row["linked_device_id"], self.device.id)
+        self.assertEqual((row["company"], row["model"]), ("集团总部", "C9500"))
+        second = self.client.post("/api/cmdb/auto-link", json={
+            "include_devices": True, "include_servers": False,
+            "create_missing": True, "sync_existing": True,
+        })
+        self.assertEqual((second.json()["created"], second.json()["updated"]), (0, 1))
+        self.assertEqual(self.db.query(CMDBAsset).count(), 1)
+
     def test_csv_template_import_dedup_overwrite_and_export(self):
         raw = (
             "name,asset_type,asset_tag,lifecycle_status,operational_status,environment,"

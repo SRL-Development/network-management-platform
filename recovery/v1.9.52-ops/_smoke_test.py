@@ -154,7 +154,7 @@ def main():
         status_path = os.path.join(data_dir, "backups", "upgrade_status.json")
         with open(status_path, encoding="utf-8") as handle:
             upgrade_status = json.load(handle)
-        ok = (revision == "20261119_0012" and marker == "preserved-from-v1.9.36"
+        ok = (revision == "20261119_0013" and marker == "preserved-from-v1.9.36"
               and upgrade_status.get("status") == "success")
         passed += log("legacy v1.9.36 data upgraded and preserved", ok, f"revision={revision}")
         failed += (0 if ok else 1)
@@ -194,7 +194,7 @@ def main():
         passed += log("shared application shell bundled on business pages", ok)
         failed += int(not ok)
         css_st, ui_css, _ = req("GET", "/static/css/style.css", cookie=admin_cookie)
-        ok = (css_st == 200 and 'design system · v1.9.52.11' in ui_css
+        ok = (css_st == 200 and 'design system · v1.9.52.12' in ui_css
               and '@media (max-width: 900px)' in ui_css and '.modal-overlay.active' in ui_css)
         passed += log("responsive design system bundled", ok)
         failed += int(not ok)
@@ -232,7 +232,7 @@ def main():
             cmdb_summary, autosync = {}, {}
         ok = (
             cmdb_st == cmdb_js_st == cmdb_css_st == cmdb_summary_st == cmdb_catalog_st == cmdb_export_st == autosync_st == 200 and cmdb_create_st == 201
-            and "CMDB 配置项与资产生命周期" in cmdb_page and "/api/cmdb/batch-status" in cmdb_js
+            and "CMDB 配置项与资产生命周期" in cmdb_page and "/api/cmdb/batch-status" in cmdb_js and "/api/cmdb/auto-link" in cmdb_js
             and "/api/cmdb/import" in cmdb_js and "ip_addresses_json" in cmdb_export_body
             and ".cmdb-kpis" in cmdb_css and len(cmdb_row.get("ip_addresses", [])) == 1
             and len(cmdb_row.get("serial_numbers", [])) == 1 and cmdb_row.get("days_remaining") == 45
@@ -240,6 +240,17 @@ def main():
             and "operational" in cmdb_summary and "interval_minutes" in autosync
         )
         passed += log("CMDB lifecycle, multi-value inventory, expiry warning and vCenter autosync bundled", ok)
+        failed += int(not ok)
+
+        notify_st, notify_page, _ = req("GET", "/notifications", cookie=admin_cookie)
+        notify_cfg_st, notify_cfg_body, _ = req("GET", "/api/notifications/config", cookie=admin_cookie)
+        try:
+            notify_cfg = json.loads(notify_cfg_body)
+        except Exception:
+            notify_cfg = {}
+        ok = (notify_st == notify_cfg_st == 200 and "匿名 SMTP" in notify_page
+              and notify_cfg.get("anonymous_only") is True and "cmdb_expiry" in notify_cfg.get("available_modules", {}))
+        passed += log("anonymous modular email notification center bundled", ok)
         failed += int(not ok)
 
         st, isp_page, _ = req("GET", "/isp", cookie=admin_cookie)
