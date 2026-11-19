@@ -4,6 +4,7 @@ SetCompressor /SOLID lzma
 
 !include "nsDialogs.nsh"
 !include "LogicLib.nsh"
+!include "FileFunc.nsh"
 
 !define VER "1.9.16"
 !define APPNAME "Cisco Network Manager"
@@ -41,7 +42,9 @@ Var StopWait
 Var StopProcess
 
 ; Stop only this service. Numeric SCM states avoid localized command parsing.
-; A stuck wrapper is force-stopped only after confirming its exact image path.
+; A stuck wrapper is force-stopped only after the SCM PID is revalidated and
+; its real process image is confirmed to be nssm.exe. Checking the executable
+; name instead of one fixed install path also supports legacy/custom locations.
 Function StopPlatformService
   StrCpy $StopResult 1
   StrCpy $StopScm 0
@@ -70,7 +73,7 @@ Function StopPlatformService
     StrCpy $StopPid $3
     StrCmp $StopState 1 stop_success
     IntOp $StopWait $StopWait + 1
-    IntCmp $StopWait 120 stop_scoped_force stop_wait stop_done
+    IntCmp $StopWait 30 stop_scoped_force stop_wait stop_done
   stop_wait:
     Sleep 1000
     Goto stop_poll
@@ -83,14 +86,18 @@ Function StopPlatformService
     StrCpy $8 ${NSIS_MAX_STRLEN}
     System::Call 'kernel32::QueryFullProcessImageName(p $StopProcess, i 0, t .r9, *i r8) i.r0'
     StrCmp $0 0 stop_done
-    StrCmp $9 "$INSTDIR\nssm.exe" 0 stop_done
+    ${GetFileName} "$9" $7
+    StrCmp $7 "nssm.exe" stop_force_revalidate 0
+    DetailPrint "Refusing forced stop: service PID $StopPid image is $9"
+    Goto stop_done
+  stop_force_revalidate:
     ; Re-query immediately, while holding the verified process handle.
     System::Call 'advapi32::QueryServiceStatusEx(p $StopService, i 0, p $StopBuffer, i 36, *i .r0) i.r1'
     StrCmp $1 0 stop_done
     System::Call '*$StopBuffer(i, i.r2, i, i, i, i, i, i.r3, i)'
     StrCmp $2 3 0 stop_done
     StrCmp $3 $StopPid 0 stop_done
-    DetailPrint "Stopping verified platform process tree: PID $StopPid"
+    DetailPrint "Stopping verified platform NSSM process tree: PID $StopPid ($9)"
     nsExec::ExecToLog 'taskkill /F /PID $StopPid /T'
     Pop $0
     StrCpy $StopWait 0

@@ -15,6 +15,7 @@ query=subprocess.run(['sc.exe','query',service],capture_output=True)
 if query.returncode!=1060:
     raise RuntimeError('Probe requires an absent randomly named service')
 script='''!include "LogicLib.nsh"
+!include "FileFunc.nsh"
 !define SERVICE "__SERVICE__"
 Name "Read-only SCM probe"
 OutFile "probe.exe"
