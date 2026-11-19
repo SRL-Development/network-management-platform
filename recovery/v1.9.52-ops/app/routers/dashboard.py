@@ -1,11 +1,11 @@
 """Dashboard API routes."""
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.database import get_db
-from app.models import Device, ConfigBackup, Neighbor, TaskLog, DeviceGroup, DeviceInfo, ScheduleConfig
+from app.models import CMDBAsset, Device, ConfigBackup, Neighbor, TaskLog, DeviceGroup, DeviceInfo, ScheduleConfig
 from app.scheduler.tasks import get_running_schedule_ids
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
@@ -21,6 +21,21 @@ def get_dashboard(db: Session = Depends(get_db)):
     online_devices = db.query(Device).filter(Device.is_active == True, Device.status == "online").count()
     offline_devices = db.query(Device).filter(Device.is_active == True, Device.status == "offline").count()
     unknown_devices = db.query(Device).filter(Device.is_active == True, Device.status == "unknown").count()
+
+    # CMDB warning window: earliest of the original purchase expiry and all
+    # hardware warranty / software licence / support entitlement dates.
+    cmdb_expired = cmdb_expiring_90 = 0
+    today = date.today()
+    for asset in db.query(CMDBAsset).all():
+        dates = [asset.initial_expiry_date] if asset.initial_expiry_date else []
+        dates.extend(item.end_date for item in asset.entitlements if item.end_date)
+        if not dates:
+            continue
+        remaining = (min(dates) - today).days
+        if remaining < 0:
+            cmdb_expired += 1
+        elif remaining <= 90:
+            cmdb_expiring_90 += 1
 
     total_backups = db.query(ConfigBackup).count()
     backups_today = db.query(ConfigBackup).filter(ConfigBackup.backup_time >= today_start).count()
@@ -96,6 +111,8 @@ def get_dashboard(db: Session = Depends(get_db)):
         "online_devices": online_devices,
         "offline_devices": offline_devices,
         "unknown_devices": unknown_devices,
+        "cmdb_expired": cmdb_expired,
+        "cmdb_expiring_90": cmdb_expiring_90,
         "total_backups": total_backups,
         "backups_today": backups_today,
         "last_backup_time": last_backup.backup_time if last_backup else None,

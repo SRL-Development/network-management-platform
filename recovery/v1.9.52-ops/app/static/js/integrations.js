@@ -103,6 +103,38 @@ async function loadIntegrationNICs() {
     }
 }
 
+async function loadVcenterAutoSync() {
+    const status = document.getElementById('vcenter-autosync-status');
+    try {
+        const data = await API.get('/api/integrations/vcenter-autosync');
+        document.getElementById('vcenter-autosync-enabled').checked = data.enabled;
+        document.getElementById('vcenter-autosync-interval').value = String(data.interval_minutes || 60);
+        const next = data.next_run ? formatDateTime(data.next_run) : '未安排';
+        const last = data.last_run ? `${formatDateTime(data.last_run)}（${data.last_run_status || '未知'}）` : '尚未运行';
+        status.textContent = `${data.configured_sources} 个连接 · 下次 ${next} · 最近 ${last}`;
+    } catch (error) {
+        status.textContent = `自动同步配置读取失败：${error.message}`;
+        status.style.color = '#c0392b';
+    }
+}
+
+async function saveVcenterAutoSync() {
+    const button = document.getElementById('vcenter-autosync-save');
+    button.disabled = true;
+    try {
+        const result = await API.put('/api/integrations/vcenter-autosync', {
+            enabled: document.getElementById('vcenter-autosync-enabled').checked,
+            interval_minutes: Number(document.getElementById('vcenter-autosync-interval').value),
+        });
+        showToast(result.enabled ? 'vCenter 自动同步已启用' : 'vCenter 自动同步已停用', 'success');
+        await loadVcenterAutoSync();
+    } catch (error) {
+        showToast(`保存自动同步失败：${error.message}`, 'error');
+    } finally {
+        button.disabled = false;
+    }
+}
+
 async function saveIntegrationConfig(source, quiet = false) {
     const config = collectIntegrationConfig(source);
     const selected = selectedIntegrationSource(source);
@@ -290,9 +322,11 @@ async function initializeIntegrations() {
     await loadIntegrationNICs();
     await loadIntegrationConfig();
     await loadVcenterSources();
+    await loadVcenterAutoSync();
 }
 initializeIntegrations();
 loadSyncHistory();
+document.getElementById('vcenter-autosync-save').addEventListener('click', saveVcenterAutoSync);
 
 async function loadSyncHistory() {
     const body = document.getElementById('sync-history-body');

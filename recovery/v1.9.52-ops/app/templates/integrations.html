@@ -68,6 +68,17 @@
                 <button class="btn btn-outline" data-action="preview" data-source="vcenter">差异预演</button>
                 <button class="btn btn-primary" data-action="sync" data-source="vcenter">全量同步</button>
             </div>
+            <div class="vcenter-autosync" style="margin-top:16px;padding:14px;border:1px solid #dce7ef;border-radius:8px;background:#f8fbfd;">
+                <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+                    <div><strong>自动同步</strong><div id="vcenter-autosync-status" style="font-size:12px;color:#6c757d;margin-top:3px;">正在读取同步计划…</div></div>
+                    <label><input id="vcenter-autosync-enabled" type="checkbox"> 启用所有 vCenter / ESXi 来源自动同步</label>
+                </div>
+                <div style="display:flex;gap:8px;align-items:flex-end;margin-top:10px;flex-wrap:wrap;">
+                    <label style="flex:1;min-width:180px;">同步频率<select id="vcenter-autosync-interval" class="form-control"><option value="15">每 15 分钟</option><option value="30">每 30 分钟</option><option value="60" selected>每小时</option><option value="360">每 6 小时</option><option value="1440">每天 02:30</option></select></label>
+                    <button class="btn btn-outline" id="vcenter-autosync-save" type="button">保存自动同步</button>
+                </div>
+                <small style="display:block;margin-top:8px;color:#6c757d;">每次同步会重试最多 3 次；只更新本地清单并标记失联，不会关机、删除或修改 vCenter 中的对象。</small>
+            </div>
             <div id="vcenter-status" style="font-size:13px;margin-top:10px;color:#6c757d;"></div>
         </div>
     </div>

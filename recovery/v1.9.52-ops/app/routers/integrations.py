@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 from typing import Any, Literal, Annotated
-from pydantic import StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 from app.services.integration_sources import config_key, provider
 
 IntegrationSource = Annotated[str, StringConstraints(pattern=r'^(?:zabbix|vcenter(?:-[0-9a-f]{12})?)$')]
@@ -16,7 +16,7 @@ from app.api_models import (
     VCenterConfigRequest, ZabbixConfigRequest,
 )
 from app.database import get_db
-from app.models import IntegrationStorage, IntegrationSyncRun, SystemSetting, VMInstance, decrypt_password, encrypt_password
+from app.models import IntegrationStorage, IntegrationSyncRun, ScheduleConfig, SystemSetting, VMInstance, decrypt_password, encrypt_password
 from app.services import integration_service, integration_sync_service
 from app.services.nic_service import get_default_source_ip, get_network_interfaces, get_preferred_source_ip
 
@@ -34,6 +34,21 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         "verify_ssl": True, "timeout": 30,
     },
 }
+
+AUTOSYNC_CRONS = {15: "*/15 * * * *", 30: "*/30 * * * *", 60: "30 */1 * * *", 360: "30 */6 * * *", 1440: "30 2 * * *"}
+
+
+class VCenterAutoSyncRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = False
+    interval_minutes: int = Field(default=60)
+
+    @field_validator("interval_minutes")
+    @classmethod
+    def validate_interval(cls, value: int) -> int:
+        if value not in AUTOSYNC_CRONS:
+            raise ValueError("同步频率仅支持 15、30、60、360 或 1440 分钟")
+        return value
 
 
 def _stored_config(db: Session, source: str, with_password: bool = False) -> dict[str, Any]:
@@ -162,6 +177,50 @@ def list_vcenter_sources(db: Session = Depends(get_db)):
         except ValueError:
             continue
     return sources
+
+
+def _autosync_response(db: Session) -> dict[str, Any]:
+    schedules = db.query(ScheduleConfig).filter(ScheduleConfig.task_type == "vcenter_sync").order_by(ScheduleConfig.id).all()
+    schedule = schedules[0] if schedules else None
+    reverse = {cron: minutes for minutes, cron in AUTOSYNC_CRONS.items()}
+    return {
+        "enabled": any(row.is_enabled for row in schedules),
+        "interval_minutes": reverse.get(schedule.cron_expression if schedule else "", 60),
+        "cron_expression": schedule.cron_expression if schedule else AUTOSYNC_CRONS[60],
+        "last_run": schedule.last_run if schedule else None,
+        "next_run": schedule.next_run if schedule else None,
+        "last_run_status": schedule.last_run_status if schedule else None,
+        "configured_sources": len(list_vcenter_sources(db)),
+    }
+
+
+@router.get('/vcenter-autosync')
+def get_vcenter_autosync(db: Session = Depends(get_db)):
+    return _autosync_response(db)
+
+
+@router.put('/vcenter-autosync')
+def save_vcenter_autosync(payload: VCenterAutoSyncRequest, request: Request, db: Session = Depends(get_db)):
+    schedules = db.query(ScheduleConfig).filter(ScheduleConfig.task_type == "vcenter_sync").order_by(ScheduleConfig.id).all()
+    schedule = schedules[0] if schedules else None
+    if schedule is None:
+        schedule = ScheduleConfig(task_type="vcenter_sync", cron_expression=AUTOSYNC_CRONS[payload.interval_minutes], description="vCenter 自动资产同步")
+        db.add(schedule)
+    schedule.cron_expression = AUTOSYNC_CRONS[payload.interval_minutes]
+    schedule.is_enabled = payload.enabled
+    schedule.description = f"vCenter 自动资产同步（每 {payload.interval_minutes} 分钟）"
+    # The integration page owns one canonical plan. Disable old duplicate
+    # vCenter schedules so turning this switch off cannot leave a hidden job active.
+    for duplicate in schedules[1:]:
+        duplicate.is_enabled = False
+    db.commit()
+    from app.scheduler.tasks import reload_scheduler
+    reload_scheduler()
+    request.state.audit_action = "integration.vcenter.autosync.configure"
+    request.state.audit_resource_type = "integration"
+    request.state.audit_resource_id = "vcenter"
+    request.state.audit_detail = {"enabled": payload.enabled, "interval_minutes": payload.interval_minutes}
+    return _autosync_response(db)
 
 
 @router.post('/vcenter-sources')

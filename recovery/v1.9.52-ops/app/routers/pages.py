@@ -37,6 +37,7 @@ router.add_api_route("/isp", _page("isp.html"), response_class=HTMLResponse, met
 router.add_api_route("/datacenter", _page("dc.html"), response_class=HTMLResponse, methods=["GET"])
 router.add_api_route("/assets", _page("assets.html"), response_class=HTMLResponse, methods=["GET"])
 router.add_api_route("/servers", _page("servers.html"), response_class=HTMLResponse, methods=["GET"])
+router.add_api_route("/cmdb", _page("cmdb.html"), response_class=HTMLResponse, methods=["GET"])
 router.add_api_route("/accounts", _page("accounts.html"), response_class=HTMLResponse, methods=["GET"])
 router.add_api_route("/vms", _page("vms.html"), response_class=HTMLResponse, methods=["GET"])
 router.add_api_route("/integrations", _page("integrations.html"), response_class=HTMLResponse, methods=["GET"])

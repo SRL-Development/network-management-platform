@@ -14,6 +14,7 @@ import sqlite3
 import textwrap
 import tempfile
 import socket
+from datetime import date, timedelta
 
 try:
     import sitecustomize
@@ -153,7 +154,7 @@ def main():
         status_path = os.path.join(data_dir, "backups", "upgrade_status.json")
         with open(status_path, encoding="utf-8") as handle:
             upgrade_status = json.load(handle)
-        ok = (revision == "20260925_0010" and marker == "preserved-from-v1.9.36"
+        ok = (revision == "20261119_0011" and marker == "preserved-from-v1.9.36"
               and upgrade_status.get("status") == "success")
         passed += log("legacy v1.9.36 data upgraded and preserved", ok, f"revision={revision}")
         failed += (0 if ok else 1)
@@ -193,7 +194,7 @@ def main():
         passed += log("shared application shell bundled on business pages", ok)
         failed += int(not ok)
         css_st, ui_css, _ = req("GET", "/static/css/style.css", cookie=admin_cookie)
-        ok = (css_st == 200 and 'design system · v1.9.52.8' in ui_css
+        ok = (css_st == 200 and 'design system · v1.9.52.9' in ui_css
               and '@media (max-width: 900px)' in ui_css and '.modal-overlay.active' in ui_css)
         passed += log("responsive design system bundled", ok)
         failed += int(not ok)
@@ -213,6 +214,37 @@ def main():
               and '网络运营驾驶舱' in cockpit_page and 'ck-health-ring' in cockpit_page
               and '/api/dashboard' in cockpit_js and '.cockpit-grid-main' in cockpit_css)
         passed += log("large-screen operations cockpit bundled", ok)
+        failed += int(not ok)
+
+        cmdb_st, cmdb_page, _ = req("GET", "/cmdb", cookie=admin_cookie)
+        cmdb_js_st, cmdb_js, _ = req("GET", "/static/js/cmdb.js", cookie=admin_cookie)
+        cmdb_css_st, cmdb_css, _ = req("GET", "/static/css/cmdb.css", cookie=admin_cookie)
+        cmdb_create_st, cmdb_body, _ = req("POST", "/api/cmdb/assets", {
+            "name": "smoke-cmdb", "asset_type": "网络设备", "lifecycle_status": "在用",
+            "criticality": "关键", "initial_expiry_date": str(date.today() + timedelta(days=75)),
+            "ip_addresses": [{"address": "192.0.2.80", "purpose": "管理", "is_primary": True}],
+            "serial_numbers": [{"serial_number": "SMOKE-SN-1", "kind": "主机序列号", "label": "主机"}],
+            "entitlements": [{"entitlement_type": "硬件维保", "name": "smoke warranty", "end_date": str(date.today() + timedelta(days=45)), "reminder_days": 90}],
+        }, cookie=admin_cookie)
+        try:
+            cmdb_row = json.loads(cmdb_body)
+        except Exception:
+            cmdb_row = {}
+        cmdb_summary_st, cmdb_summary_body, _ = req("GET", "/api/cmdb/summary?days=90", cookie=admin_cookie)
+        autosync_st, autosync_body, _ = req("GET", "/api/integrations/vcenter-autosync", cookie=admin_cookie)
+        try:
+            cmdb_summary = json.loads(cmdb_summary_body)
+            autosync = json.loads(autosync_body)
+        except Exception:
+            cmdb_summary, autosync = {}, {}
+        ok = (
+            cmdb_st == cmdb_js_st == cmdb_css_st == cmdb_summary_st == autosync_st == 200 and cmdb_create_st == 201
+            and "CMDB 资产生命周期" in cmdb_page and "/api/cmdb/batch-status" in cmdb_js
+            and ".cmdb-kpis" in cmdb_css and len(cmdb_row.get("ip_addresses", [])) == 1
+            and len(cmdb_row.get("serial_numbers", [])) == 1 and cmdb_row.get("days_remaining") == 45
+            and cmdb_summary.get("expiring_90", 0) >= 1 and "interval_minutes" in autosync
+        )
+        passed += log("CMDB lifecycle, multi-value inventory, expiry warning and vCenter autosync bundled", ok)
         failed += int(not ok)
 
         st, isp_page, _ = req("GET", "/isp", cookie=admin_cookie)

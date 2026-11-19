@@ -8,6 +8,7 @@
     <title>{{ app_name }}</title>
     <link rel="stylesheet" href="/static/css/style.css?v={{APP_VERSION}}">
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    {% block head %}{% endblock %}
 </head>
 <body class="app-body">
     <a class="skip-link" href="#mainContent">跳到主要内容</a>
@@ -45,6 +46,7 @@
             <a href="/datacenter" id="nav-datacenter" data-module="dc"><span class="nav-icon">▥</span><span>数据中心</span></a>
             <a href="/assets" id="nav-assets" data-module="assets"><span class="nav-icon">□</span><span>其他资产</span></a>
             <a href="/servers" id="nav-servers" data-module="servers"><span class="nav-icon">▣</span><span>服务器存储</span></a>
+            <a href="/cmdb" id="nav-cmdb" data-module="cmdb"><span class="nav-icon">◫</span><span>CMDB 生命周期</span></a>
             <a href="/vms" id="nav-vms" data-module="vms"><span class="nav-icon">▧</span><span>虚拟机系统</span></a>
             <a href="/integrations" id="nav-integrations" data-module="integrations"><span class="nav-icon">⌁</span><span>平台集成</span></a>
 

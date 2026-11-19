@@ -81,6 +81,14 @@
             <div class="stat-label">服务器/存储</div>
         </div>
     </div>
+    <div class="stat-card">
+        <div class="stat-icon orange">⏳</div>
+        <div>
+            <div class="stat-value" id="stat-cmdb-expiry">-</div>
+            <div class="stat-label">CMDB 到期 / 已过期</div>
+            <a href="/cmdb?expiry=90" style="font-size:12px;text-decoration:none;">查看维保授权 →</a>
+        </div>
+    </div>
 </div>
 
 <!-- Two column layout -->
@@ -237,6 +245,7 @@ async function loadDashboard() {
         document.getElementById('stat-backups-today').textContent = data.backups_today;
         document.getElementById('stat-neighbors').textContent = data.total_neighbors;
         document.getElementById('stat-changes').textContent = data.devices_with_changes;
+        document.getElementById('stat-cmdb-expiry').textContent = `${data.cmdb_expiring_90}/${data.cmdb_expired}`;
 
         // Recent tasks
         const tasksBody = document.getElementById('recentTasksBody');

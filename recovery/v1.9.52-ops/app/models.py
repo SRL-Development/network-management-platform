@@ -6,7 +6,7 @@ import uuid
 import hashlib
 from datetime import datetime
 from sqlalchemy import (
-    Column, Integer, String, Text, Boolean, DateTime, ForeignKey, JSON, Float,
+    Column, Integer, String, Text, Boolean, Date, DateTime, ForeignKey, JSON, Float,
     UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
@@ -577,6 +577,98 @@ class ServerIP(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     server = relationship("ServerAsset", back_populates="extra_ips")
+
+
+# ============================================================================
+# CMDB — 统一资产生命周期（网络设备 / 服务器 / 存储 / 其他）
+# 主记录只保存稳定属性；多 IP、多序列号、多维保授权和生命周期事件使用子表。
+# ============================================================================
+
+class CMDBAsset(Base):
+    """Configuration item with lifecycle, ownership and purchase metadata."""
+    __tablename__ = "cmdb_assets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(200), nullable=False, index=True)
+    asset_type = Column(String(50), default="网络设备", nullable=False, index=True)
+    brand = Column(String(100), default="")
+    model = Column(String(200), default="")
+    asset_tag = Column(String(100), default="", index=True)
+    linked_device_id = Column(Integer, ForeignKey("devices.id", ondelete="SET NULL"), nullable=True, index=True)
+    linked_server_id = Column(Integer, ForeignKey("server_assets.id", ondelete="SET NULL"), nullable=True, index=True)
+    lifecycle_status = Column(String(30), default="在用", nullable=False, index=True)
+    criticality = Column(String(20), default="一般", nullable=False, index=True)
+    purchase_date = Column(Date, nullable=True, index=True)
+    initial_expiry_date = Column(Date, nullable=True, index=True)
+    vendor = Column(String(200), default="")
+    purchase_order = Column(String(100), default="")
+    purchase_cost = Column(Float, nullable=True)
+    currency = Column(String(10), default="CNY")
+    department = Column(String(100), default="", index=True)
+    owner = Column(String(100), default="", index=True)
+    location = Column(String(300), default="")
+    notes = Column(Text, default="")
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    ip_addresses = relationship("CMDBIPAddress", back_populates="asset", cascade="all, delete-orphan", order_by="CMDBIPAddress.id")
+    serial_numbers = relationship("CMDBSerialNumber", back_populates="asset", cascade="all, delete-orphan", order_by="CMDBSerialNumber.id")
+    entitlements = relationship("CMDBEntitlement", back_populates="asset", cascade="all, delete-orphan", order_by="CMDBEntitlement.end_date")
+    lifecycle_events = relationship("CMDBLifecycleEvent", back_populates="asset", cascade="all, delete-orphan", order_by="CMDBLifecycleEvent.event_date")
+
+
+class CMDBIPAddress(Base):
+    __tablename__ = "cmdb_ip_addresses"
+    __table_args__ = (UniqueConstraint("asset_id", "address", name="uq_cmdb_asset_ip"),)
+
+    id = Column(Integer, primary_key=True)
+    asset_id = Column(Integer, ForeignKey("cmdb_assets.id", ondelete="CASCADE"), nullable=False, index=True)
+    address = Column(String(45), nullable=False, index=True)
+    purpose = Column(String(100), default="管理")
+    is_primary = Column(Boolean, default=False, nullable=False)
+    asset = relationship("CMDBAsset", back_populates="ip_addresses")
+
+
+class CMDBSerialNumber(Base):
+    __tablename__ = "cmdb_serial_numbers"
+    __table_args__ = (UniqueConstraint("asset_id", "serial_number", name="uq_cmdb_asset_serial"),)
+
+    id = Column(Integer, primary_key=True)
+    asset_id = Column(Integer, ForeignKey("cmdb_assets.id", ondelete="CASCADE"), nullable=False, index=True)
+    serial_number = Column(String(200), nullable=False, index=True)
+    kind = Column(String(50), default="主机序列号")
+    label = Column(String(100), default="")
+    asset = relationship("CMDBAsset", back_populates="serial_numbers")
+
+
+class CMDBEntitlement(Base):
+    """Hardware warranty, software licence or vendor support contract."""
+    __tablename__ = "cmdb_entitlements"
+
+    id = Column(Integer, primary_key=True)
+    asset_id = Column(Integer, ForeignKey("cmdb_assets.id", ondelete="CASCADE"), nullable=False, index=True)
+    entitlement_type = Column(String(50), default="硬件维保", nullable=False, index=True)
+    name = Column(String(200), nullable=False)
+    vendor = Column(String(200), default="")
+    contract_number = Column(String(100), default="")
+    start_date = Column(Date, nullable=True)
+    end_date = Column(Date, nullable=True, index=True)
+    reminder_days = Column(Integer, default=90, nullable=False)
+    notes = Column(Text, default="")
+    asset = relationship("CMDBAsset", back_populates="entitlements")
+
+
+class CMDBLifecycleEvent(Base):
+    __tablename__ = "cmdb_lifecycle_events"
+
+    id = Column(Integer, primary_key=True)
+    asset_id = Column(Integer, ForeignKey("cmdb_assets.id", ondelete="CASCADE"), nullable=False, index=True)
+    stage = Column(String(30), nullable=False, index=True)
+    event_date = Column(Date, nullable=False, index=True)
+    operator = Column(String(100), default="")
+    notes = Column(Text, default="")
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    asset = relationship("CMDBAsset", back_populates="lifecycle_events")
 
 
 # ============================================================================

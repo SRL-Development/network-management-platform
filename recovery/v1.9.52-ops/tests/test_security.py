@@ -265,7 +265,7 @@ class UpgradePersistenceTests(unittest.TestCase):
                     profile = db.query(CredentialProfile).filter_by(name="upgrade-profile").one()
                     assert profile.get_password() == "credential-survives-upgrade"
                     revision = db.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-                    assert revision == "20260925_0010"
+                    assert revision == "20261119_0011"
                 commands = load_commands()
                 assert commands["custom_platform"]["probe"]["command"] == " show version "
                 print((Path(DATA_DIR) / ".secret_key").read_text(encoding="utf-8").strip())
@@ -286,7 +286,7 @@ class UpgradePersistenceTests(unittest.TestCase):
                 (Path(data_dir) / "backups" / "upgrade_status.json").read_text(encoding="utf-8")
             )
             self.assertEqual(status["status"], "success")
-            self.assertEqual(status["revision_after"], "20260925_0010")
+            self.assertEqual(status["revision_after"], "20261119_0011")
             self.assertTrue(Path(status["backup_path"]).is_file())
 
     def test_installers_do_not_overwrite_or_delete_persistent_configuration(self):
@@ -362,7 +362,7 @@ class UpgradePersistenceTests(unittest.TestCase):
                 assert connection.execute('PRAGMA foreign_key_check').fetchall() == []
                 tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
                 assert {"integration_storage_assets", "vm_storage_links", "integration_sync_runs"} <= tables
-                assert revision == "20260925_0010"
+                assert revision == "20261119_0011"
                 assert "isp_lines" in tables
                 connection.close()
                 """
@@ -886,7 +886,7 @@ class ApplicationSecurityIntegrationTests(unittest.TestCase):
         from app.database import engine
         with engine.connect() as connection:
             revision = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-        self.assertEqual(revision, "20260925_0010")
+        self.assertEqual(revision, "20261119_0011")
         self.client.post("/api/auth/logout")
         response = self.client.post(
             "/api/auth/login",
