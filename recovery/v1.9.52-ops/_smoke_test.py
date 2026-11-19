@@ -194,7 +194,7 @@ def main():
         passed += log("shared application shell bundled on business pages", ok)
         failed += int(not ok)
         css_st, ui_css, _ = req("GET", "/static/css/style.css", cookie=admin_cookie)
-        ok = (css_st == 200 and 'design system · v1.9.52.9' in ui_css
+        ok = (css_st == 200 and 'design system · v1.9.52.10' in ui_css
               and '@media (max-width: 900px)' in ui_css and '.modal-overlay.active' in ui_css)
         passed += log("responsive design system bundled", ok)
         failed += int(not ok)

@@ -1,4 +1,4 @@
-"""Static contract tests for the shared v1.9.52.9 UI system."""
+"""Static contract tests for the shared v1.9.52.10 UI system."""
 import re
 import unittest
 from pathlib import Path
@@ -34,7 +34,7 @@ class SharedUiSystemTests(unittest.TestCase):
     def test_design_system_covers_core_components_and_responsive_modes(self):
         source = (ROOT / "app" / "static" / "css" / "style.css").read_text(encoding="utf-8")
         for marker in (
-            "Cisco Network Manager design system · v1.9.52.9", ".topbar {",
+            "Cisco Network Manager design system · v1.9.52.10", ".topbar {",
             "table.data-table th {", ".modal-overlay.active", ".login-shell {",
             ".module-overview {", ".section-jumpbar {", ".table-summary {",
             "@media (max-width: 900px)", "@media (max-width: 720px)",

@@ -1,4 +1,4 @@
-# v1.9.52.9 Windows CMDB 生命周期与 vCenter 自动同步版
+# v1.9.52.10 Windows CMDB 生命周期与 vCenter 自动同步版
 
 此版本供现有 SQLite 安装升级；不自动迁移 PostgreSQL、不内置 PG 服务，不自动启用 HTTPS。
 沿用已保存的数据目录、数据库、配置及加密密钥。升级前请在平台创建应用数据备份，并另存整个数据目录。
