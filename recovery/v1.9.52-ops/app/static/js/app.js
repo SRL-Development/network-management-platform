@@ -147,7 +147,6 @@ function deviceTypeLabel(type) {
     const path = window.location.pathname;
     const navMap = {
         '/': 'nav-dashboard',
-        '/cockpit': 'nav-cockpit',
         '/devices': 'nav-devices',
         '/topology': 'nav-topology',
         '/backups': 'nav-backups',

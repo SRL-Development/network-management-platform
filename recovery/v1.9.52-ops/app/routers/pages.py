@@ -24,7 +24,6 @@ def _page(template_name: str):
 
 
 router.add_api_route("/", _page("dashboard.html"), response_class=HTMLResponse, methods=["GET"])
-router.add_api_route("/cockpit", _page("cockpit.html"), response_class=HTMLResponse, methods=["GET"])
 router.add_api_route("/devices", _page("devices.html"), response_class=HTMLResponse, methods=["GET"])
 router.add_api_route("/topology", _page("topology.html"), response_class=HTMLResponse, methods=["GET"])
 router.add_api_route("/backups", _page("backups.html"), response_class=HTMLResponse, methods=["GET"])

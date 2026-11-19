@@ -10,21 +10,6 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class SharedUiSystemTests(unittest.TestCase):
-    def test_cockpit_is_dashboard_authorized_and_routed(self):
-        self.assertEqual(module_for_path("/cockpit"), "dashboard")
-        pages = (ROOT / "app" / "routers" / "pages.py").read_text(encoding="utf-8")
-        self.assertIn('router.add_api_route("/cockpit", _page("cockpit.html")', pages)
-
-    def test_cockpit_has_operational_domains_and_accessible_controls(self):
-        source = (ROOT / "app" / "templates" / "cockpit.html").read_text(encoding="utf-8")
-        for marker in (
-            'class="cockpit-kpis"', 'id="ck-health-ring"', 'id="ck-alerts"',
-            'id="ck-ipam-prefixes"', 'id="ck-vm-states"', 'id="ck-isp-util"',
-            'id="cockpit-interval"', 'id="cockpit-fullscreen"',
-            '/static/js/cockpit.js', '/static/css/cockpit.css',
-        ):
-            self.assertIn(marker, source)
-
     def test_all_business_pages_use_shared_shell(self):
         routed = {
             "dashboard.html", "devices.html", "device_detail.html", "topology.html",

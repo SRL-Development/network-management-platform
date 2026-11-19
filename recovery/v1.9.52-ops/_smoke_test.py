@@ -207,15 +207,6 @@ def main():
               and 'initModuleWorkspace' in app_js_body and 'table-summary' in app_js_body)
         passed += log("per-module information presentation bundled", ok)
         failed += int(not ok)
-        cockpit_st, cockpit_page, _ = req("GET", "/cockpit", cookie=admin_cookie)
-        cockpit_js_st, cockpit_js, _ = req("GET", "/static/js/cockpit.js", cookie=admin_cookie)
-        cockpit_css_st, cockpit_css, _ = req("GET", "/static/css/cockpit.css", cookie=admin_cookie)
-        ok = (cockpit_st == 200 and cockpit_js_st == 200 and cockpit_css_st == 200
-              and '网络运营驾驶舱' in cockpit_page and 'ck-health-ring' in cockpit_page
-              and '/api/dashboard' in cockpit_js and '.cockpit-grid-main' in cockpit_css)
-        passed += log("large-screen operations cockpit bundled", ok)
-        failed += int(not ok)
-
         cmdb_st, cmdb_page, _ = req("GET", "/cmdb", cookie=admin_cookie)
         cmdb_js_st, cmdb_js, _ = req("GET", "/static/js/cmdb.js", cookie=admin_cookie)
         cmdb_css_st, cmdb_css, _ = req("GET", "/static/css/cmdb.css", cookie=admin_cookie)

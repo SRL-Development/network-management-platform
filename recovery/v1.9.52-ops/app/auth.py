@@ -66,7 +66,6 @@ MODULE_LABELS = {m[0]: m[1] for m in MODULES}
 
 # 请求路径 -> 模块 前缀映射（取最长匹配）。
 PATH_MODULES = [
-    ("/cockpit", "dashboard"),
     ("/api/isp", "isp"), ("/isp", "isp"),
     ("/api/users", "users"), ("/users", "users"),
     ("/api/accounts", "accounts"), ("/accounts", "accounts"),
