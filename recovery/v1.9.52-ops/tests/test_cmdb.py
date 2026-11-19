@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
-from app.models import CMDBAsset, Device, ScheduleConfig
+from app.models import CMDBAsset, Device, DeviceInfo, ScheduleConfig
 from app.routers.cmdb import router as cmdb_router
 from app.routers.integrations import router as integrations_router
 
@@ -98,6 +98,98 @@ class CMDBTests(unittest.TestCase):
         result = self.client.post("/api/cmdb/batch-delete", json={"ids": [created["id"]]})
         self.assertEqual(result.json()["deleted"], 1)
         self.assertEqual(self.db.query(CMDBAsset).count(), 0)
+
+    def test_linked_device_automatically_hydrates_identity(self):
+        self.device.model = "C9500-48Y4C"
+        self.device.status = "online"
+        self.db.add(DeviceInfo(
+            device_id=self.device.id, vendor="Cisco", model="C9500-48Y4C",
+            serial_number="FOC-LINKED-1", location="总部机房", contact="网络组",
+        ))
+        self.db.commit()
+        response = self.client.post("/api/cmdb/assets", json={
+            "name": "", "linked_device_id": self.device.id,
+            "asset_type": "网络设备", "lifecycle_status": "在用",
+        })
+        self.assertEqual(response.status_code, 201, response.text)
+        row = response.json()
+        self.assertEqual(row["name"], "core-sw")
+        self.assertEqual(row["brand"], "Cisco")
+        self.assertEqual(row["model"], "C9500-48Y4C")
+        self.assertEqual(row["source_of_truth"], "设备管理")
+        self.assertEqual(row["operational_status"], "运行")
+        self.assertEqual([item["address"] for item in row["ip_addresses"]], ["10.0.0.1"])
+        self.assertEqual([item["serial_number"] for item in row["serial_numbers"]], ["FOC-LINKED-1"])
+
+    def test_csv_template_import_dedup_overwrite_and_export(self):
+        raw = (
+            "name,asset_type,asset_tag,lifecycle_status,operational_status,environment,"
+            "business_service,primary_ip,serial_numbers,owner\n"
+            "边界防火墙,安全设备,SEC-001,在用,运行,生产,互联网出口,192.0.2.10,PA-001,安全组\n"
+        ).encode("utf-8-sig")
+        response = self.client.post(
+            "/api/cmdb/import?mode=skip", files={"file": ("cmdb.csv", raw, "text/csv")},
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["created"], 1)
+        repeated = self.client.post(
+            "/api/cmdb/import?mode=skip", files={"file": ("cmdb.csv", raw, "text/csv")},
+        ).json()
+        self.assertEqual((repeated["created"], repeated["skipped"]), (0, 1))
+        overwrite = raw.replace("安全组".encode(), "SOC".encode())
+        updated = self.client.post(
+            "/api/cmdb/import?mode=overwrite", files={"file": ("cmdb.csv", overwrite, "text/csv")},
+        ).json()
+        self.assertEqual(updated["updated"], 1)
+        self.assertEqual(self.client.get("/api/cmdb/assets").json()[0]["owner"], "SOC")
+
+        template = self.client.get("/api/cmdb/export?template=true")
+        exported = self.client.get("/api/cmdb/export")
+        self.assertEqual(template.status_code, 200)
+        self.assertTrue(template.content.startswith(b"\xef\xbb\xbf"))
+        text = exported.content.decode("utf-8-sig")
+        self.assertIn("ip_addresses_json", text)
+        self.assertIn("SEC-001", text)
+
+    def test_asset_classes_company_and_custom_catalogs(self):
+        saved = self.client.put("/api/cmdb/catalog", json={
+            "asset_types": ["防火墙", "无线 AP", "财务软件"],
+            "entitlement_types": ["硬件维保", "软件维保", "安全订阅"],
+            "companies": ["集团总部", "子公司 A"],
+        })
+        self.assertEqual(saved.status_code, 200, saved.text)
+        self.assertIn("财务软件", saved.json()["asset_types"])
+
+        firewall = self.client.post("/api/cmdb/assets", json={
+            "name": "边界防火墙", "asset_class": "硬件", "asset_type": "防火墙",
+            "company": "集团总部", "purchase_date": "2026-01-01",
+            "entitlements": [
+                {"entitlement_type": "硬件维保", "name": "整机维保"},
+                {"entitlement_type": "安全订阅", "name": "威胁防护订阅"},
+            ],
+        })
+        software = self.client.post("/api/cmdb/assets", json={
+            "name": "财务系统", "asset_class": "软件", "asset_type": "财务软件",
+            "company": "子公司 A", "entitlements": [
+                {"entitlement_type": "软件维保", "name": "年度升级服务"},
+            ],
+        })
+        ap = self.client.post("/api/cmdb/assets", json={
+            "name": "AP-01", "asset_class": "硬件", "asset_type": "无线 AP",
+            "company": "集团总部", "purchase_date": "2025-06-01", "entitlements": [],
+        })
+        self.assertEqual((firewall.status_code, software.status_code, ap.status_code), (201, 201, 201))
+        self.assertEqual(len(firewall.json()["entitlements"]), 2)
+        self.assertEqual(ap.json()["entitlements"], [])
+        rows = self.client.get("/api/cmdb/assets?asset_class=软件&company=子公司%20A").json()
+        self.assertEqual([row["name"] for row in rows], ["财务系统"])
+
+        blocked = self.client.put("/api/cmdb/catalog", json={
+            "asset_types": ["防火墙", "无线 AP"],
+            "entitlement_types": ["硬件维保", "安全订阅"],
+            "companies": ["集团总部"],
+        })
+        self.assertEqual(blocked.status_code, 409)
 
     def test_vcenter_autosync_configuration(self):
         with patch("app.scheduler.tasks.reload_scheduler"):

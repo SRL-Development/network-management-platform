@@ -41,6 +41,21 @@ Var StopPid
 Var StopWait
 Var StopProcess
 
+Function AppendUpgradeDiagnostic
+  Exch $0
+  Push $1
+  CreateDirectory "$INSTDIR"
+  ClearErrors
+  FileOpen $1 "$INSTDIR\upgrade-diagnostics.log" a
+  IfErrors diagnostic_done
+  FileSeek $1 0 END
+  FileWrite $1 "$0$\r$\n"
+  FileClose $1
+  diagnostic_done:
+    Pop $1
+    Pop $0
+FunctionEnd
+
 ; Stop only this service. Numeric SCM states avoid localized command parsing.
 ; A stuck wrapper is force-stopped only after the SCM PID is revalidated and
 ; its real process image is confirmed to be nssm.exe. Checking the executable
@@ -78,8 +93,15 @@ Function StopPlatformService
     Sleep 1000
     Goto stop_poll
   stop_scoped_force:
-    StrCmp $StopState 3 0 stop_done
+    ; Some legacy NSSM builds remain RUNNING or PAUSED after accepting a stop
+    ; request instead of transitioning to STOP_PENDING. The PID still comes
+    ; from this exact SCM service, so any non-stopped state can use the same
+    ; scoped image verification before termination.
+    StrCmp $StopState 1 stop_success
     StrCmp $StopPid 0 stop_done
+    DetailPrint "Graceful service stop timed out: state=$StopState pid=$StopPid"
+    Push "Service graceful stop timed out: state=$StopState pid=$StopPid"
+    Call AppendUpgradeDiagnostic
     System::Call 'kernel32::OpenProcess(i 0x1000, i 0, i $StopPid) p.r0'
     StrCpy $StopProcess $0
     StrCmp $StopProcess 0 stop_done
@@ -95,7 +117,7 @@ Function StopPlatformService
     System::Call 'advapi32::QueryServiceStatusEx(p $StopService, i 0, p $StopBuffer, i 36, *i .r0) i.r1'
     StrCmp $1 0 stop_done
     System::Call '*$StopBuffer(i, i.r2, i, i, i, i, i, i.r3, i)'
-    StrCmp $2 3 0 stop_done
+    StrCmp $2 1 stop_success
     StrCmp $3 $StopPid 0 stop_done
     DetailPrint "Stopping verified platform NSSM process tree: PID $StopPid ($9)"
     nsExec::ExecToLog 'taskkill /F /PID $StopPid /T'
@@ -198,14 +220,20 @@ Section "Install"
   ; CRITICAL: disable nssm auto-restart BEFORE stopping, otherwise nssm
   ; respawns the process between our stop and file-copy, re-locking the exe.
   DetailPrint "Disabling nssm auto-restart (AppExit Default Exit) ..."
+  Push "Beginning upgrade to ${VER}"
+  Call AppendUpgradeDiagnostic
   nsExec::ExecToLog '"$INSTDIR\nssm.exe" set ${SERVICE} AppExit Default Exit'
 
   DetailPrint "Stopping existing service (for upgrade) ..."
   Call StopPlatformService
   ${If} $StopResult != 0
+    Push "Service stop failed: state=$StopState pid=$StopPid"
+    Call AppendUpgradeDiagnostic
     MessageBox MB_ICONSTOP "The platform service could not be stopped safely. No program files were replaced. Check the service or restart Windows, then retry."
     Abort
   ${EndIf}
+  Push "Service stopped successfully"
+  Call AppendUpgradeDiagnostic
 
   ; Keep the stopped service registration until the new executable is safely
   ; in place. If replacement fails, the previous service can be restarted.

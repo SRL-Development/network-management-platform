@@ -265,7 +265,7 @@ class UpgradePersistenceTests(unittest.TestCase):
                     profile = db.query(CredentialProfile).filter_by(name="upgrade-profile").one()
                     assert profile.get_password() == "credential-survives-upgrade"
                     revision = db.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-                    assert revision == "20261119_0011"
+                    assert revision == "20261119_0012"
                 commands = load_commands()
                 assert commands["custom_platform"]["probe"]["command"] == " show version "
                 print((Path(DATA_DIR) / ".secret_key").read_text(encoding="utf-8").strip())
@@ -286,7 +286,7 @@ class UpgradePersistenceTests(unittest.TestCase):
                 (Path(data_dir) / "backups" / "upgrade_status.json").read_text(encoding="utf-8")
             )
             self.assertEqual(status["status"], "success")
-            self.assertEqual(status["revision_after"], "20261119_0011")
+            self.assertEqual(status["revision_after"], "20261119_0012")
             self.assertTrue(Path(status["backup_path"]).is_file())
 
     def test_installers_do_not_overwrite_or_delete_persistent_configuration(self):
@@ -304,6 +304,8 @@ class UpgradePersistenceTests(unittest.TestCase):
         self.assertIn('${GetFileName} "$9" $7', nsi)
         self.assertIn('StrCmp $7 "nssm.exe" stop_force_revalidate', nsi)
         self.assertIn("IntCmp $StopWait 30 stop_scoped_force", nsi)
+        self.assertIn('StrCmp $StopState 1 stop_success', nsi)
+        self.assertIn('Graceful service stop timed out: state=$StopState pid=$StopPid', nsi)
         self.assertNotIn('taskkill /F /IM nssm.exe', nsi)
         self.assertNotIn("cmd /c copy /Y", nsi)
         self.assertIn("New-ItemProperty -Path $StateKey -Name DataDir", install_ps1)
@@ -366,7 +368,7 @@ class UpgradePersistenceTests(unittest.TestCase):
                 assert connection.execute('PRAGMA foreign_key_check').fetchall() == []
                 tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
                 assert {"integration_storage_assets", "vm_storage_links", "integration_sync_runs"} <= tables
-                assert revision == "20261119_0011"
+                assert revision == "20261119_0012"
                 assert "isp_lines" in tables
                 connection.close()
                 """
@@ -890,7 +892,7 @@ class ApplicationSecurityIntegrationTests(unittest.TestCase):
         from app.database import engine
         with engine.connect() as connection:
             revision = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-        self.assertEqual(revision, "20261119_0011")
+        self.assertEqual(revision, "20261119_0012")
         self.client.post("/api/auth/logout")
         response = self.client.post(
             "/api/auth/login",

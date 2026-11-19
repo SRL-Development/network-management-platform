@@ -1,4 +1,4 @@
-# 1.9.52.10 CMDB 生命周期与 vCenter 自动同步迭代（基于1.9.52.8）
+# 1.9.52.11 CMDB 治理、导入导出与升级修复迭代（基于1.9.52.8）
 
 1. 网络设备显式绑定机柜；设备与机柜双向反查，也展示机房资产关联。
 2. 备份告警包含设备/IP/失败阶段/错误。先确认，再从告警列表移除；原任务与审计保留。
@@ -21,13 +21,24 @@
 13. 平台集成内直接维护 vCenter 自动同步开关和频率，多来源统一同步并保留失败重试与失联保护。
 14. 新增 CMDB 标准生命周期模型：主资产、多IP、多序列号、多维保授权、生命周期事件；关联网络设备或服务器/存储。
 15. 首次购买到期和维保/授权结束日统一进入90天预警，清单支持多选、全选、批量阶段变更和批量删除。
+16. CMDB 关联网络设备或服务器/存储时自动带入身份、IP、序列号、位置和责任人；保留手工再次同步入口。
+17. 生命周期和运行状态分开，新增环境、业务服务、权威数据源与核验日期，用于数据质量治理。
+18. CMDB 支持 CSV 模板、导入导出、稳定标识去重、跳过/确认覆盖和多值 JSON 无损往返。
+19. CMDB 新增硬件/软件/其他一级大类、可维护二级资产类型、可维护维保/授权类型，并复用设备管理公司目录。
+    防火墙可同时维护硬件维保和订阅；软件支持独立软件维保；AP 等资产允许不设置维保但保留购买时间。
+20. CMDB 列表、筛选、CSV 和稳定标识匹配均包含公司与资产大类；删除仍被引用的类型或公司会被拒绝。
 
 ISP数据建模参考NetBox官方文档：运营商内线路编号唯一、地址独立状态/用途。
 https://netboxlabs.com/docs/netbox/models/circuits/circuit/
 https://netbox.readthedocs.io/en/stable/models/ipam/ipaddress/
 端口台账为本平台扩展，不声称NetBox提供相同PAT建模。
 
-升级仅新增表；完整data目录（尤其数据库和.secret_key）需保留。
+CMDB 身份、关系与数据治理参考：
+https://netboxlabs.com/docs/netbox/models/dcim/device/
+https://www.servicenow.com/docs/r/servicenow-platform/configuration-management-database-cmdb/c_ITILConfigurationManagement.html
+https://www.dmtf.org/sites/default/files/standards/documents/DSP2046_2021.1.pdf
+
+升级仅新增表或字段；完整data目录（尤其数据库和.secret_key）需保留。
 安装包与程序测试不替代真实设备采集、vCenter端到端及目标Windows服务升级验收。
 
 ## 入口
@@ -42,8 +53,8 @@ https://netbox.readthedocs.io/en/stable/models/ipam/ipaddress/
 
 ## 验证与升级注意
 
-- 123项后端回归通过，17组前端测试通过，冻结程序63项烟雾测试通过。
-- 冻结程序使用独立旧版测试数据库迁移至20261119_0011，确认旧记录、旧机柜文本U位和旧ISP位置保留。
+- 128项后端回归通过，16组前端测试通过；冻结程序烟雾测试在安装包构建后执行。
+- 冻结程序使用独立旧版测试数据库迁移至20261119_0012，确认旧记录、旧机柜文本U位和旧ISP位置保留。
 - 本次保持SQLite数据，不安装内置PG，不执行SQLite转PG。
 - 升级前停止采集/备份任务，备份完整data目录；保持原安装目录和数据目录。
 - 安装器停止逻辑不再按名称结束所有NSSM；仅在验证服务PID和完整路径后处理本平台进程树。

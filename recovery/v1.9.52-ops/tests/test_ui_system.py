@@ -1,4 +1,4 @@
-"""Static contract tests for the shared v1.9.52.10 UI system."""
+"""Static contract tests for the shared v1.9.52.11 UI system."""
 import re
 import unittest
 from pathlib import Path
@@ -34,7 +34,7 @@ class SharedUiSystemTests(unittest.TestCase):
     def test_design_system_covers_core_components_and_responsive_modes(self):
         source = (ROOT / "app" / "static" / "css" / "style.css").read_text(encoding="utf-8")
         for marker in (
-            "Cisco Network Manager design system · v1.9.52.10", ".topbar {",
+            "Cisco Network Manager design system · v1.9.52.11", ".topbar {",
             "table.data-table th {", ".modal-overlay.active", ".login-shell {",
             ".module-overview {", ".section-jumpbar {", ".table-summary {",
             "@media (max-width: 900px)", "@media (max-width: 720px)",
@@ -59,9 +59,9 @@ class SharedUiSystemTests(unittest.TestCase):
         cmdb_js = (ROOT / "app" / "static" / "js" / "cmdb.js").read_text(encoding="utf-8")
         integration = (ROOT / "app" / "templates" / "integrations.html").read_text(encoding="utf-8")
         integration_js = (ROOT / "app" / "static" / "js" / "integrations.js").read_text(encoding="utf-8")
-        for marker in ('id="cmdb-select-all"', 'id="cmdb-ip-list"', 'id="cmdb-serial-list"', 'id="cmdb-entitlement-list"', 'id="cmdb-event-list"'):
+        for marker in ('id="cmdb-select-all"', 'id="cmdb-ip-list"', 'id="cmdb-serial-list"', 'id="cmdb-entitlement-list"', 'id="cmdb-event-list"', 'id="cmdb-import"', 'id="cmdb-export"', 'id="cmdb-operational-status"', 'id="cmdb-source-of-truth"', 'id="cmdb-asset-class"', 'id="cmdb-company"', 'id="cmdb-manage-catalog"'):
             self.assertIn(marker, cmdb)
-        for marker in ("/api/cmdb/assets", "/api/cmdb/batch-delete", "/api/cmdb/batch-status"):
+        for marker in ("/api/cmdb/assets", "/api/cmdb/batch-delete", "/api/cmdb/batch-status", "/api/cmdb/import", "/api/cmdb/export", "/api/cmdb/catalog", "importLinked(false,true)"):
             self.assertIn(marker, cmdb_js)
         self.assertIn('id="vcenter-autosync-enabled"', integration)
         self.assertIn('/api/integrations/vcenter-autosync', integration_js)

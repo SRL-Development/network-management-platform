@@ -2,8 +2,16 @@
 {% block head %}<link rel="stylesheet" href="/static/css/cmdb.css?v={{APP_VERSION}}">{% endblock %}
 {% block content %}
 <div class="page-header">
-  <div><h1>🧭 CMDB 资产生命周期</h1><p>统一关联网络设备与服务器/存储，维护多 IP、多序列号、购买信息、硬件维保、软件授权和完整生命周期。</p></div>
-  <button class="btn btn-primary" id="cmdb-add" type="button">＋ 新增 CMDB 资产</button>
+  <div><h1>🧭 CMDB 配置项与资产生命周期</h1><p>统一身份、运行状态、业务归属、权威数据源、多 IP、多序列号及维保授权。</p></div>
+  <div class="cmdb-page-actions">
+    <select id="cmdb-import-mode" class="form-control" aria-label="CMDB导入策略"><option value="skip">重复跳过</option><option value="overwrite">确认后覆盖</option></select>
+    <button class="btn btn-outline" id="cmdb-template" type="button">下载模板</button>
+    <button class="btn btn-outline" id="cmdb-import" type="button">导入 CSV</button>
+    <button class="btn btn-outline" id="cmdb-export" type="button">导出</button>
+    <button class="btn btn-outline" id="cmdb-manage-catalog" type="button">分类与公司维护</button>
+    <input id="cmdb-import-file" type="file" accept=".csv,text/csv" hidden>
+    <button class="btn btn-primary" id="cmdb-add" type="button">＋ 新增 CMDB 资产</button>
+  </div>
 </div>
 
 <section class="cmdb-kpis" aria-label="CMDB概览">
@@ -13,11 +21,21 @@
   <article class="card danger"><span>已经过期</span><strong id="cmdb-expired">0</strong><small>需要续保或处置</small></article>
 </section>
 
+<section class="card cmdb-governance" aria-label="CMDB数据治理规则">
+  <article><strong>稳定身份</strong><span>关联对象 → 资产编号 → 序列号 → IP → 名称+类型</span></article>
+  <article><strong>双层状态</strong><span>生命周期表示从规划到处置；运行状态表示当前是否运行</span></article>
+  <article><strong>可追溯资料</strong><span>记录业务服务、权威数据源和最近核验日期</span></article>
+</section>
+
 <section class="card cmdb-toolbar">
   <div class="cmdb-filters">
     <label>搜索<input id="cmdb-search" class="form-control" type="search" placeholder="名称、IP、序列号、型号、责任人"></label>
+    <label>资产大类<select id="cmdb-class-filter" class="form-control"><option value="">全部大类</option></select></label>
     <label>资产类型<select id="cmdb-type-filter" class="form-control"><option value="">全部类型</option></select></label>
+    <label>公司<select id="cmdb-company-filter" class="form-control"><option value="">全部公司</option></select></label>
     <label>生命周期<select id="cmdb-status-filter" class="form-control"><option value="">全部阶段</option></select></label>
+    <label>运行状态<select id="cmdb-operational-filter" class="form-control"><option value="">全部状态</option></select></label>
+    <label>环境<select id="cmdb-environment-filter" class="form-control"><option value="">全部环境</option></select></label>
     <label>到期状态<select id="cmdb-expiry-filter" class="form-control"><option value="">全部</option><option value="expired">已过期</option><option value="30">30 天内</option><option value="90">90 天内</option><option value="none">未设置到期日</option></select></label>
     <button class="btn btn-outline" id="cmdb-refresh" type="button">刷新</button>
   </div>
@@ -48,15 +66,22 @@
       <input id="cmdb-id" type="hidden">
       <div class="cmdb-form-grid">
         <label>设备名称 *<input id="cmdb-name" class="form-control" required maxlength="200"></label>
+        <label>资产大类<select id="cmdb-asset-class" class="form-control"></select></label>
         <label>资产类型<select id="cmdb-asset-type" class="form-control"></select></label>
+        <label>所属公司<select id="cmdb-company" class="form-control"><option value="">未指定</option></select></label>
         <label>品牌<input id="cmdb-brand" class="form-control" maxlength="100"></label>
         <label>型号<input id="cmdb-model" class="form-control" maxlength="200"></label>
         <label>资产编号<input id="cmdb-asset-tag" class="form-control" maxlength="100"></label>
         <label>重要程度<select id="cmdb-criticality" class="form-control"><option>低</option><option selected>一般</option><option>重要</option><option>关键</option></select></label>
         <label>生命周期阶段<select id="cmdb-lifecycle-status" class="form-control"></select></label>
+        <label>运行状态<select id="cmdb-operational-status" class="form-control"></select></label>
+        <label>环境<select id="cmdb-environment" class="form-control"></select></label>
+        <label>业务服务 / 系统<input id="cmdb-business-service" class="form-control" maxlength="200" placeholder="例如：园区网核心"></label>
+        <label>权威数据源<select id="cmdb-source-of-truth" class="form-control"></select></label>
+        <label>最近核验日期<input id="cmdb-last-verified" class="form-control" type="date"></label>
         <label>关联类型<select id="cmdb-link-kind" class="form-control"><option value="">不关联</option><option value="device">网络设备</option><option value="server">服务器 / 存储</option></select></label>
         <label class="span-2">关联现有设备<select id="cmdb-link-id" class="form-control"><option value="">请选择</option></select></label>
-        <div class="cmdb-import-link"><button class="btn btn-sm btn-outline" id="cmdb-import-linked" type="button">从关联设备带入名称 / IP / 序列号</button></div>
+        <div class="cmdb-import-link"><button class="btn btn-sm btn-outline" id="cmdb-import-linked" type="button">重新同步关联资料</button></div>
       </div>
 
       <div class="cmdb-section"><header><div><h4>管理 IP</h4><p>支持多网卡、多管理面地址；最多设置一个主 IP。</p></div><button class="btn btn-sm btn-outline" id="cmdb-add-ip" type="button">＋ IP</button></header><div id="cmdb-ip-list" class="cmdb-repeater"></div></div>
@@ -76,6 +101,22 @@
       <label>备注<textarea id="cmdb-notes" class="form-control" rows="3" maxlength="4000"></textarea></label>
       <div id="cmdb-form-error" class="form-error" role="alert"></div>
       <div class="modal-footer"><button class="btn btn-outline" data-cmdb-close type="button">取消</button><button class="btn btn-primary" id="cmdb-save" type="submit">保存资产</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="cmdb-catalog-modal" aria-hidden="true">
+  <div class="modal cmdb-timeline-modal" role="dialog" aria-modal="true" aria-labelledby="cmdb-catalog-title">
+    <div class="modal-header"><h3 id="cmdb-catalog-title">CMDB 分类与公司维护</h3><button class="btn btn-sm btn-outline" data-catalog-close type="button">关闭</button></div>
+    <form id="cmdb-catalog-form" class="modal-body">
+      <p>每行一个值。已被资产、维保记录或设备使用的值不能删除；资产大类固定为硬件、软件、其他。</p>
+      <div class="cmdb-form-grid">
+        <label>资产类型<textarea id="cmdb-catalog-asset-types" class="form-control" rows="12" placeholder="防火墙&#10;交换机&#10;业务软件"></textarea></label>
+        <label>维保 / 授权类型<textarea id="cmdb-catalog-entitlement-types" class="form-control" rows="12" placeholder="硬件维保&#10;软件维保&#10;订阅服务"></textarea></label>
+        <label>公司<textarea id="cmdb-catalog-companies" class="form-control" rows="12" placeholder="集团总部&#10;子公司 A"></textarea></label>
+      </div>
+      <div id="cmdb-catalog-error" class="form-error" role="alert"></div>
+      <div class="modal-footer"><button class="btn btn-outline" data-catalog-close type="button">取消</button><button class="btn btn-primary" type="submit">保存目录</button></div>
     </form>
   </div>
 </div>
